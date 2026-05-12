@@ -1,0 +1,176 @@
+---
+- name: Configure Docker and AWS CLI 
+  hosts: minecraft  # We are applying this to the minecraft server 
+  become: true 
+  vars: 
+    aws_account_id: "65464281242"
+    aws_region: us-east-1
+    ecr_repo_name: minecraft_ecr
+    ecr_repo_uri: "{{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ ecr_repo_name }}"
+    image_tag: "mc-26.4.2-v1"
+ 
+
+  # Below are actual steps executed by Ansible 
+  tasks:
+
+    # 1.) Install Docker
+
+     - name: Install Docker prerequisites 
+       apt: 
+         name: 
+	   - ca-certificates 
+	   - curl 
+	   - gnupg 
+	 state: present 
+	 update_cache: true 
+
+
+     - name: Add Docker GPG key
+       shell: |
+         install -m 0755 -d /etc/apt/keyrings
+         curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+       args:
+         creates: /etc/apt/keyrings/docker.asc
+
+
+     - name: Add Docker apt repository
+       shell: |
+         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+       args:
+         creates: /etc/apt/sources.list.d/docker.list
+
+
+     - name: Install Docker Engine
+       apt: 
+         name: 
+	   - docker-ce
+	   - docker-ce-cli
+	   - containerd.io
+	   - docker-compose-plugin
+	 state: present 
+	 update_cache: true 
+
+
+     - name: Ensure Docker is running 
+       service:
+         name: docker
+         state: started 
+         enabled: true
+
+
+#     - name: Add EC2 user to Docker user group
+#       user: 
+#         name: "{{ ansible_user }}"
+#         groups: docker 
+#         append: true  
+
+    - name: Install required packages for AWS CLI
+      apt:
+        name:
+          - curl
+          - unzip
+        state: present
+
+
+    - name: Download AWS CLI installer
+      get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+
+
+    - name: Unzip AWS CLI installer
+      unarchive:
+        src: "/tmp/awscliv2.zip"
+        dest: "/tmp"
+        remote_src: yes
+
+
+    - name: Run AWS CLI installer
+      command: "/tmp/aws/install"
+      args: 
+        creates: /usr/local/bin/aws
+
+
+    - name: Verify AWS CLI installation
+      command: "aws --version"
+      register: aws_cli_version
+
+
+    - name: Display AWS CLI version
+      debug:
+        msg: "{{ aws_cli_version.stdout }}"
+
+
+   # 3.) Authenticate Docker with ECR 
+
+    - name: Authenticate Docker to ECR 
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin \
+        {{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com
+      no_log: true 
+
+
+   - name: Pull Minecraft image from Docker Hub
+     ansible.builtin.command: 
+       cmd: > 
+         docker pull itzg/minecraft-server:2026.4.2-java21
+         docker run -d -it -p 25565:25565 -e EULA=TRUE itzg/minecraft-server:2026.4.2-java21
+         docker tag itzg/minecraft-server:2026.4.2-java21{{ ecr_repo_uri }}:{{ image_tag }}
+
+
+   - name: Push the tagged image to ECR 
+     ansible.builtin.command: 
+       cmd: >
+         docker push {{ ecr_repo_uri }}:{{ image_tag }}
+
+
+   - name: Show push result 
+     ansible.builtin.debug:
+       msg: "Pushed {{ ecr_repo_uri }}:{{ image_tag }}
+
+
+
+      
+
+
+  
+
+   # 4.) Write the Docker Compose file
+
+    - name: Write Docker Compose File
+      copy:
+      dest: /home/ubuntu
+      content: |
+        services:
+          mc:
+            image: itzg/minecraft-server:2025.8.0-java21
+            restart: unless-stopped
+            tty: true
+            stdin_open: true
+            ports:
+              - "25565:25565"
+            environment:
+              EULA: "TRUE"               
+              VERSION: "1.21.4"
+            volumes:
+              - mc_data:/data
+      volumes:
+        mc_data:
+
+
+
+
+   # 5.) Mount the /data volume on the container 
+
+
+
+   # 6.) Restore from S3 bucket before starting container when rebuild/recovery
+
+
+
+   # 7.) Start the minecraft container 
+
+
+   # 3.) Authenticate with ECR
