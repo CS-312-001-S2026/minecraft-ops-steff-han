@@ -44,3 +44,37 @@ resource "aws_instance" "mc_server" {
    }
 }
 
+# Have Terraform automatically generae the inventory file in case we do terraform destroy
+resource "local_file" "inventory" {
+  content = <<-EOT
+    [minecraft]
+    mc_server ansible_host=${aws_instance.mc_server.public_ip} ansible_host=ubuntu ansible_ssh_private_key_file=~/cs312/minecraft-key.pem
+  EOT
+  filename = "${path.module}/ansible/inventory"
+}
+
+# Allow Terraform to use our Ansible playbook while provisioning
+resource "null_resource" "configure" {
+  depends_on = [aws_instance.mc_server, local_file.inventory]
+  
+  triggers = {
+    instance_id = aws_instance.mc_server.id
+    playbook_hash = filemd5("./ansible/configure.yml")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      ansible-playbook \
+        -i '${aws_instance.mc_server.public_ip},' \
+        -u ubuntu \
+        --private-key ../../minecraft-key.pem \
+        -v \
+        ./ansible/configure.yml
+    EOT
+    
+    environment = {
+      ANSIBLE_CONFIG = "${path.module}/ansible/ansible.cfg"
+    }
+  }
+}
+

@@ -1,6 +1,6 @@
 ---
 - name: Configure Docker and AWS CLI
-  hosts: minecraft  # We are applying this to the minecraft server
+  hosts: all  # We are applying this to the minecraft server
   become: true
   vars:
     aws_account_id: "654654281242"
@@ -58,6 +58,8 @@
         state: started
         enabled: true
 
+
+   # 2.) Install AWS CLI
 
     - name: Install required packages for AWS CLI
       ansible.builtin.apt:
@@ -151,6 +153,7 @@
               environment:
                 EULA: "TRUE"
                 VERSION: "1.21.4"
+                MOTD: "CS 312 Ops 3 - Hana Steffen (Student ID: 934437814)"
               volumes:
                 - /data:/data
 
@@ -159,6 +162,6 @@
    
     - name: Start the Docker Container
       ansible.builtin.command:
-        cmd: docker compose up -d
+        cmd: docker compose up -d --force-recreate
         chdir: /home/ubuntu
       changed_when: false
