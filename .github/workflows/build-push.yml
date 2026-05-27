@@ -66,11 +66,11 @@ jobs:
         
 
       - name: Tag and push images to ECR
-         env:
-           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-         run: |
-           docker tag ${{ env.VERSION_2025 }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY}}:${{ env.VERSION_2025_TAG }}
-           docker tag ${{ env.VERSION_2026 }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
-           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2025_TAG }}
-           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag ${{ env.VERSION_2025 }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY}}:${{ env.VERSION_2025_TAG }}
+          docker tag ${{ env.VERSION_2026 }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2025_TAG }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
 
