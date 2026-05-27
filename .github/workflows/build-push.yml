@@ -15,8 +15,9 @@ env:
 
 
 jobs: 
-  publish: 
+  build-test-push: 
     runs-on: ubuntu-latest
+
 
     steps:
       - name: Configure AWS credentials
