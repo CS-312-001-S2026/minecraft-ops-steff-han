@@ -1,0 +1,76 @@
+name: Retag pinned upstream image and publish to ECR
+
+on: 
+  push: 
+    tags: 
+      - 'mc-*'
+
+env:
+  AWS_REGION: us-east-1 
+  ECR_REPOSITORY: minecraft-server
+  VERSION_2025_TAG: mc-25.8.0-v2
+  VERSION_2026_TAG: mc-26.4.2-v1
+  VERSION_2025: itzg/minecraft-server:2025.8.0-java21 # pinned upstream image
+  VERSION_2026: itzg/minecraft-server:2026.4.2-java21 # pinned upstream image
+
+
+jobs: 
+  publish: 
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with: 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+
+      - name: Pull images from Docker Hub
+        run: |
+          docker pull ${{ env.VERSION_2025 }}
+          docker pull ${{ env.VERSION_2026 }}
+
+
+      - name: Smoke Test for newer tag (version 2026)
+        run: |
+          # Start the container briefly 
+          docker run -d --name mc-smoke-test \
+            -e EULA=TRUE \
+            -e TYPE=VANILLA \
+            ${{ env.VERSION_2026 }}
+
+          echo "Waiting for minecraft server to initialize..."
+          TIMEOUT=60
+          ELAPSED=0
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            if docker logs mc-smoke-test 2>&1 | grep -q "Done"; then
+              echo "✅ Smoke test passed — server initialized successfully"
+              docker stop mc-smoke-test
+              exit 0
+            fi
+            sleep 5
+            ELAPSED=$((ELAPSED + 5))
+          done
+
+          echo "❌ Smoke test failed — server did not initialize in time"
+          docker logs mc-smoke-test
+          docker stop mc-smoke-test
+          exit 1
+        
+
+       - name: Tag and push images to ECR
+          env:
+            ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          run: |
+            docker tag ${{ env.VERSION_2025 }} ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY}}:${{ env.VERSION_2025_TAG }}
+            docker tag ${{ env.VERSION_2026 }} ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
+            docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2025_TAG }}
+            docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
+
