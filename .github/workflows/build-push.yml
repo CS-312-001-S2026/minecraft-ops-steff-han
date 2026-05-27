@@ -73,4 +73,3 @@ jobs:
           docker tag ${{ env.VERSION_2026 }} $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2025_TAG }}
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ env.VERSION_2026_TAG }}
-
